@@ -1,6 +1,8 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2018-05-22T18:26:44
+# Project created by QtCreator
+#
+# Author Tiago Correia
 #
 #-------------------------------------------------
 
@@ -12,6 +14,8 @@ include(3rdparty/qtxlsx/qtxlsx.pri)
 
 TARGET = GymScore
 TEMPLATE = app
+VERSION = 0.1.0
+QMAKE_TARGET_DESCRIPTION = Gymnastic Score
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
@@ -24,23 +28,30 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+WIN32:RC_ICONS += app.ico
 
 SOURCES += \
-        main.cpp \
-        mainwindow.cpp \
-    information.cpp \
+    main.cpp \
+    mainwindow.cpp \
     model/xlsxsheetmodel.cpp \
-    formtable.cpp
+    formtable.cpp \
+    settings.cpp \
+    labelinfo.cpp
 
 HEADERS += \
-        mainwindow.h \
-    information.h \
+    mainwindow.h \
     model/xlsxsheetmodel.h \
     model/xlsxsheetmodel_p.h \
-    formtable.h
+    formtable.h \
+    settings.h \
+    3rdparty/exprtk.hpp \
+    labelinfo.h
 
 RESOURCES += \
     images.qrc
 
 FORMS += \
     formtable.ui
+
+DISTFILES += \
+    view.qml

@@ -8,17 +8,22 @@
 
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QCloseEvent>
+#include <QStandardPaths>
 
 FormTable::FormTable(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::FormTable),
     infoWindow(Q_NULLPTR),
+    previousPath(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)),
     currentRow(0),
     doc(Q_NULLPTR),
-    sheet(Q_NULLPTR)
+    sheet(Q_NULLPTR),
+    model(Q_NULLPTR)
 {
     ui->setupUi(this);
-    setWindowTitle(tr("Gymnastic Table Score"));
+    setWindowTitle(tr("Table Score"));
+    setWindowIcon(QIcon(":/img/gymnast.png"));
 
     connect(ui->buttonOpen, SIGNAL(clicked()), this, SLOT(openFile()));
     connect(ui->buttonSave, SIGNAL(clicked()), this, SLOT(saveFile()));
@@ -27,12 +32,49 @@ FormTable::FormTable(QWidget *parent) :
     connect(ui->buttonLeft, SIGNAL(clicked()), this, SLOT(moveLeft()));
     connect(ui->buttonRight, SIGNAL(clicked()), this, SLOT(moveRight()));
 
-    loadFile("C:/Utils/Gym/Docs/Tabela Manhã.xlsx");
+    //loadFile("C:/Utils/Gym/Docs/Tabela Manhã.xlsx");
 }
 
 FormTable::~FormTable()
 {
     delete ui;
+}
+
+
+void FormTable::closeEvent (QCloseEvent *event)
+{
+    if(model == Q_NULLPTR || !model->changed()) {
+        QMessageBox::StandardButton resBtn = QMessageBox::question(this, QApplication::applicationName(),
+                                                                   tr("Do you really want to exit?\n"),
+                                                                   QMessageBox::No | QMessageBox::Yes,
+                                                                   QMessageBox::No);
+       if (resBtn == QMessageBox::Yes) {
+           event->accept();
+           infoWindow->close();
+       } else {
+           event->ignore();
+       }
+    }
+    else {
+        // Need to ask for saving
+        QMessageBox::StandardButton resBtn = QMessageBox::question( this, QApplication::applicationName(),
+                                                                    tr("The results are not saved. Do you to discard and exit?\n"),
+                                                                    QMessageBox::Cancel | QMessageBox::Save | QMessageBox::Discard,
+                                                                    QMessageBox::Save);
+        if (resBtn == QMessageBox::Cancel) {
+            event->ignore();
+        } else if(resBtn == QMessageBox::Discard) {
+            event->accept();
+            infoWindow->close();
+        }
+        else if(saveFile()) {
+            event->accept();
+            infoWindow->close();
+        }
+        else {
+            event->ignore();
+        }
+    }
 }
 
 void FormTable::setInfoWindow(MainWindow *win)
@@ -42,11 +84,13 @@ void FormTable::setInfoWindow(MainWindow *win)
 
 void FormTable::openFile()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, "Open xlsx file", QString(), "*.xlsx");
+    QString filePath = QFileDialog::getOpenFileName(this, QApplication::applicationName() + " - " + tr("Save table"),
+                                                    previousPath, "*.xlsx");
     if (filePath.isEmpty()) {
         return;
     }
 
+    previousPath = QDir(filePath).absolutePath();
     loadFile(filePath);
 }
 
@@ -56,13 +100,14 @@ void FormTable::loadFile(const QString &filePath)
     if(doc->sheetNames().size() == 0) {
         delete doc;
         sheet = Q_NULLPTR;
-        QMessageBox::information(this, tr("Information"), tr("The file doesn't have 1 sheet. It is not valid"));
+        QMessageBox::information(this, QApplication::applicationName(), tr("The file doesn't any sheet. It is not valid to use."));
         return;
     }
 
     sheet = dynamic_cast<QXlsx::Worksheet *>(doc->sheet(doc->sheetNames().at(0)));
     if (sheet) {
-        ui->tableView->setModel(new QXlsx::SheetModel(sheet, ui->tableView));
+        model = new QXlsx::SheetModel(sheet, ui->tableView);
+        ui->tableView->setModel(model);
         foreach (QXlsx::CellRange range, sheet->mergedCells()) {
             ui->tableView->setSpan(range.firstRow()-1, range.firstColumn()-1, range.rowCount(), range.columnCount());
         }
@@ -71,17 +116,23 @@ void FormTable::loadFile(const QString &filePath)
     ui->tableView->resizeRowsToContents();
 }
 
-void FormTable::saveFile()
+bool FormTable::saveFile()
 {
-    QString filePath = QFileDialog::getSaveFileName(this, "Save results", QString(), "*.xlsx");
+    QString filePath = QFileDialog::getSaveFileName(this, QApplication::applicationName() + " - " + tr("Open File"),
+                                                    previousPath,
+                                                    "*.xlsx");
     if (filePath.isEmpty()) {
-        return;
+        return false;
     }
+    previousPath = QDir(filePath).absolutePath();
     if(doc->saveAs(filePath)) {
         QMessageBox::information(this, tr("File saved"), tr("File saved with success."));
+        model->setChanged(false);
+        return true;
     }
     else {
         QMessageBox::critical(this, tr("Error saving"), tr("Error saving file. The results not saved."));
+        return false;
     }
 }
 
@@ -105,6 +156,10 @@ void FormTable::blankInfoWindow()
 
 void FormTable::updateInfoWindow()
 {
+    if(sheet == nullptr) {
+        return;
+    }
+
     int row = ui->spinBox->value();
     if(row > sheet->dimension().lastRow()) {
         QMessageBox::warning(this, tr("Invalid row"), tr("Invalid row. It doesn't exists on the table."));

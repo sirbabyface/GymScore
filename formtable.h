@@ -6,6 +6,7 @@
 namespace QXlsx {
     class Document;
     class Worksheet;
+    class SheetModel;
 }
 
 class MainWindow;
@@ -27,19 +28,23 @@ public:
 public slots:
     void openFile();
     void loadFile(const QString &filePath);
-    void saveFile();
+    bool saveFile();
     void moveLeft();
     void moveRight();
     void blankInfoWindow();
     void updateInfoWindow();
 
 
+    void closeEvent(QCloseEvent *event);
+
 private:
     Ui::FormTable *ui;
     MainWindow *infoWindow;
+    QString previousPath;
     int currentRow;
     QXlsx::Document *doc;
     QXlsx::Worksheet *sheet;
+    QXlsx::SheetModel *model;
 };
 
 #endif // FORMTABLE_H

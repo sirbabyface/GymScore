@@ -39,7 +39,7 @@ class SheetModel : public QAbstractTableModel
     Q_OBJECT
     Q_DECLARE_PRIVATE(SheetModel)
 public:
-    explicit SheetModel(Worksheet *sheet, QObject *parent = 0);
+    explicit SheetModel(Worksheet *sheet, QObject *parent = nullptr);
     ~SheetModel();
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
@@ -51,6 +51,9 @@ public:
 
     Worksheet *sheet() const;
 
+    bool changed() const;
+    void setChanged(bool value);
+
 signals:
 
 public slots:
@@ -58,6 +61,7 @@ public slots:
 protected:
     bool updateValue(float *value, int row, int column);
     void calculateValuesRow(const QModelIndex &index);
+    bool m_changed;
 
 private:
     SheetModelPrivate * const d_ptr;

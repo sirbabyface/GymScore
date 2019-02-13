@@ -8,19 +8,24 @@
 MainWindow::MainWindow(QWidget *parent)
     : QGraphicsView (parent)
 {
+    setWindowIcon(QIcon(":/img/easel.png"));
     resize(640, 480);
-    setScene(&m_sceneInfo);
+    setScene(&m_sceneBlank);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    setWindowTitle(tr("Gymnastic Score"));
+    setWindowTitle(tr("Projection"));
 
     setupScene();
     setupBlankScene();
+    setupRankingScene();
 
     setRenderHint(QPainter::Antialiasing, true);
     setFrameStyle(QFrame::NoFrame);
 
     setBackgroundBrush(QBrush(Qt::black));
+
+    // For debugging
+    // setScene(&m_sceneRanking);
 }
 
 MainWindow::~MainWindow()
@@ -35,43 +40,88 @@ void MainWindow::paintEvent(QPaintEvent *pQEvent)
 }
 
 
-void MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet)
+QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet)
 {
     if(!m_sceneInfo.isActive()) {
         setScene(&m_sceneInfo);
     }
 
-    //updateItem(sheet->cellAt(row, 1), m_type);
+    if(isHidden()) {
+        show();
+    }
+
+    updateItemString(sheet->cellAt(row, 1), m_type);
     updateItemString(sheet->cellAt(row, 2), m_number);
     updateItemPlayers(sheet->cellAt(row, 3));
     updateItemString(sheet->cellAt(row, 4), m_level);
-    updateItemString(sheet->cellAt(row, 5), m_team);
-    updateItemFloat(sheet->cellAt(row, 12), m_difference);
-    updateItemFloat(sheet->cellAt(row, 13), m_penalization);
-    updateItemFloat(sheet->cellAt(row, 14), m_scoreExecution);
-    updateItemFloat(sheet->cellAt(row, 15), m_scoreArtistic);
-    updateItemFloat(sheet->cellAt(row, 16), m_finalScore);
+    updateItemStringCenter(sheet->cellAt(row, 5), m_club);
+    updateItemString(sheet->cellAt(row, 6), m_team, tr("Equipa"));
+    updateItemFloat(sheet->cellAt(row, 13), m_difficulty);
+    updateItemFloat(sheet->cellAt(row, 14), m_penalization);
+    updateItemFloat(sheet->cellAt(row, 15), m_scoreExecution);
+    updateItemFloat(sheet->cellAt(row, 16), m_scoreArtistic);
+    updateItemFloat(sheet->cellAt(row, 17), m_finalScore);
+
+    return &m_sceneInfo;
 }
 
 void MainWindow::updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item)
 {
-    if(!cell) return;
+    if(cell) {
+        item->setPlainText(cell->value().toString());
+    }
+}
 
-    QString value = cell->value().toString();
+void MainWindow::updateItemStringCenter(QXlsx::Cell *cell, QGraphicsTextItem *item)
+{
+    if(cell) {
+        item->setPlainText(cell->value().toString());
+        item->setPos(320 - item->boundingRect().width() / 2 * item->scale(), item->y());
+    }
+}
+
+void MainWindow::updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item, const QString &prefix)
+{
+    QString value;
+    if(!cell) {
+        value = prefix + " -";
+    }
+    else {
+        value = prefix + " " + cell->value().toString();
+    }
     item->setPlainText(value);
 }
 
 void MainWindow::updateItemFloat(QXlsx::Cell *cell, QGraphicsTextItem *item)
 {
-    if(!cell) return;
+    if(!cell) {
+        item->setPlainText("0,00");
+        return;
+    }
 
     QString value = cell->value().toString();
     bool ok;
     float numberF = value.toFloat(&ok);
-    if(!ok) return;
+    if(!ok) {
+        item->setPlainText("0,00");
+        return;
+    }
 
     int number = qRound(numberF * 100);
-    value = QString::number(number / 100) + "," + QString::number(number % 100);
+    bool isNegative = false;
+    if(number < 0) {
+        isNegative = true;
+        number = number * -1;
+    }
+    QString decimalPart = QString::number(number % 100);
+    if(decimalPart.size() == 1) {
+        decimalPart = "0" + decimalPart;
+    }
+    value = QString::number(number / 100) + "," + decimalPart;
+
+    if(isNegative) {
+        value = "-" + value;
+    }
     item->setPlainText(value);
 }
 
@@ -83,9 +133,13 @@ void MainWindow::updateItemPlayers(QXlsx::Cell *cell)
     updatePlayersPosition(players);
 }
 
-void MainWindow::blank()
+QGraphicsScene *MainWindow::blank()
 {
     setScene(&m_sceneBlank);
+    if(isHidden()) {
+        show();
+    }
+    return &m_sceneBlank;
 }
 
 void MainWindow::mouseDoubleClickEvent( QMouseEvent * e )
@@ -142,8 +196,8 @@ void MainWindow::setupScene()
     m_finalScore->setDefaultTextColor(QColor(255, 192, 0));
     m_finalScore->setPos(350, 340);
 
-    QGraphicsTextItem *labelDifference = m_sceneInfo.addText(tr("DIF"), fontLabel);
-    setItem(labelDifference, 350, 265);
+    QGraphicsTextItem *labelDifficulty = m_sceneInfo.addText(tr("DIF"), fontLabel);
+    setItem(labelDifficulty, 350, 265);
 
     QGraphicsTextItem *labelPenalty = m_sceneInfo.addText(tr("PEN"), fontLabel);
     setItem(labelPenalty, 350, 310);
@@ -154,8 +208,8 @@ void MainWindow::setupScene()
     m_scoreArtistic = m_sceneInfo.addText("0,00", fontLabel);
     setItem(m_scoreArtistic, 150, 310);
 
-    m_difference = m_sceneInfo.addText("0,00", fontLabel);
-    setItem(m_difference, 460, 265);
+    m_difficulty = m_sceneInfo.addText("0,00", fontLabel);
+    setItem(m_difficulty, 460, 265);
 
     m_penalization = m_sceneInfo.addText("0,00", fontLabel);
     setItem(m_penalization, 460, 310);
@@ -167,32 +221,112 @@ void MainWindow::setupScene()
     }
 
     QList<QString> players;
-    players << "Carolina Félix" << "Jorge";
-    players << "Carolina Félix";
+    players << "Tiago Correia" << "Mariana Correia";
+    players << "Matilde Fonseca";
     updatePlayersPosition(players);
 
-    m_level = m_sceneInfo.addText("NIVEL 1   PF", fontLabel);
-    setItem(m_level, 40, 75);
+    m_level = m_sceneInfo.addText("NIVEL 1", fontLabel);
+    setItem(m_level, 120, 75);
 
+    m_type = m_sceneInfo.addText("PF", fontLabel);
+    setItem(m_type, 40, 75);
 
-    m_team = m_sceneInfo.addText("ACM", fontLabel);
-    setItem(m_team, 200, 20);
+    m_club = m_sceneInfo.addText("ACM", fontLabel);
+    setItem(m_club, 240, 20);
+
+    m_team = m_sceneInfo.addText("Equipa A", fontLabel);
+    setItem(m_team, 460, 75);
 
     m_number = m_sceneInfo.addText("34", fontLabel);
-    setItem(m_number, 100, 20);
+    setItem(m_number, 120, 20);
 
     m_teamIcon = m_sceneInfo.addPixmap(QPixmap(":/img/acm.png"));
     m_teamIcon->setScale(0.1);
     m_teamIcon->setPos(40, 20);
 }
 
+void MainWindow::setupScene(const Settings &settings)
+{
+
+}
+
 void MainWindow::setupBlankScene()
 {
     m_sceneBlank.setBackgroundBrush(QBrush(Qt::black));
 
-    QGraphicsPixmapItem *acm = m_sceneBlank.addPixmap(QPixmap(":/img/acm.png"));
-    acm->setScale(0.7);
-    acm->setPos(320 - acm->boundingRect().width() / 2, 240 - acm->boundingRect().height() / 2);
+    // Rectangle to set the area
+    QGraphicsRectItem *block = m_sceneBlank.addRect(0, 0, 640, 480);
+    block->setPen(Qt::NoPen);
+    block->setBrush(QColor(102, 153, 51));
+    block->setZValue(-1);
+    block->hide();
+
+
+    acm = m_sceneBlank.addPixmap(QPixmap(":/img/acm.png"));
+    acm->setScale(0.6);
+    acm->update();
+    acm->setPos(320 - acm->boundingRect().width() * 0.6 / 2, 200 - acm->boundingRect().height() * 0.6 / 2);
+}
+
+void MainWindow::setupRankingScene()
+{
+    m_sceneBlank.setBackgroundBrush(QBrush(Qt::black));
+
+    // Rectangle to set the area
+    QGraphicsRectItem *block = m_sceneRanking.addRect(0, 0, 640, 480);
+    block->setPen(Qt::NoPen);
+    block->setBrush(QColor(102, 153, 51));
+    block->setZValue(-1);
+//    block->hide();
+
+    // Fonts
+    QString fontFamily = "Calibri";
+    QFont fontTitle;
+    fontTitle.setFamily(fontFamily);
+    fontTitle.setPointSize(42);
+    fontTitle.setBold(true);
+
+    QFont fontLabel;
+    fontLabel.setFamily(fontFamily);
+    fontLabel.setPointSize(32);
+    fontLabel.setBold(true);
+
+    QFont fontPlayers;
+    fontPlayers.setFamily(fontFamily);
+    fontPlayers.setPointSize(16);
+    fontPlayers.setBold(true);
+
+    // Logo on top
+    QGraphicsPixmapItem *logo = m_sceneRanking.addPixmap(QPixmap(":/img/acm.png"));
+    logo->setScale(0.1);
+    logo->setPos(40, 20);
+
+    // Create Items
+    m_rankingTitle = m_sceneRanking.addText("RANKING", fontTitle);
+    setItem(m_rankingTitle, 120, 10);
+
+    m_rankingLevel = m_sceneRanking.addText("NIVEL 1", fontLabel);
+    setItem(m_rankingLevel, 60, 75);
+
+    m_rankingType = m_sceneRanking.addText("GF", fontLabel);
+    setItem(m_rankingType, 520, 75);
+
+    int firstRowY = 135;
+    int interval = 80;
+    for (int i = 0; i < 4; ++i) {
+        m_rankingPosition[i] = m_sceneRanking.addText(QString::number(i + 1) + ".", fontPlayers);
+        setItem(m_rankingPosition[i], 40, firstRowY + interval * i);
+
+        m_rankingClub[i] = m_sceneRanking.addText("ACM", fontPlayers);
+        setItem(m_rankingClub[i], 90, firstRowY + interval * i);
+
+        m_rankingPlayers[i] = m_sceneRanking.addText("Francisca Sena, Sara Machado\nJoana Conceição", fontPlayers);
+        setItem(m_rankingPlayers[i], 90, firstRowY + 25 + interval * i);
+
+        m_rankingScore[i] = m_sceneRanking.addText("22,21", fontPlayers);
+        setItem(m_rankingScore[i], 480, firstRowY + interval * i);
+    }
+
 }
 
 void MainWindow::updatePlayersPosition(const QList<QString> &players)

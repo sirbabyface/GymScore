@@ -52,7 +52,8 @@ SheetModelPrivate::SheetModelPrivate(SheetModel *p)
  * Creates a model object with the given \a sheet and \a parent.
  */
 SheetModel::SheetModel(Worksheet *sheet, QObject *parent)
-    :QAbstractTableModel(parent), d_ptr(new SheetModelPrivate(this))
+    :QAbstractTableModel(parent), d_ptr(new SheetModelPrivate(this)),
+     m_changed(false)
 {
     d_ptr->sheet = sheet;
 }
@@ -68,7 +69,7 @@ SheetModel::~SheetModel()
 int SheetModel::rowCount(const QModelIndex &/*parent*/) const
 {
     Q_D(const SheetModel);
-    return d->sheet->dimension().lastRow() - 1;
+    return d->sheet->dimension().lastRow() - 1; // header line, is used for captions
 }
 
 
@@ -80,7 +81,7 @@ int SheetModel::columnCount(const QModelIndex &/*parent*/) const
 
 Qt::ItemFlags SheetModel::flags(const QModelIndex &index) const
 {
-    if(index.column() < 13) {
+    if(index.column() < 14) {
         return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable;
     }
     else {
@@ -202,17 +203,6 @@ QVariant SheetModel::headerData(int section, Qt::Orientation orientation, int ro
     return QVariant();
 }
 
-//QVariant SheetModel::headerData(int section, Qt::Orientation orientation, int role) const
-//{
-//    if (role == Qt::DisplayRole) {
-//        if (orientation == Qt::Horizontal)
-//            return col_to_name(section + 1);
-//        else
-//            return QString::number(section + 1);
-//    }
-//    return QVariant();
-//}
-
 bool SheetModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     Q_D(const SheetModel);
@@ -223,6 +213,7 @@ bool SheetModel::setData(const QModelIndex &index, const QVariant &value, int ro
     if (role == Qt::EditRole) {
         if (d->sheet->write(index.row()+2, index.column()+1, value)) {
             calculateValuesRow(index);
+            m_changed = true;
             return true;
         }
     }
@@ -265,23 +256,34 @@ void SheetModel::calculateValuesRow(const QModelIndex &index)
     float am, em, final;
     int row = index.row()+2;
 
+    int firstColumn = 7;
 
-    if(!updateValue(&e1, row, 6)) return;
-    if(!updateValue(&e2, row, 7)) return;
-    if(!updateValue(&e3, row, 8)) return;
-    if(!updateValue(&a1, row, 9)) return;
-    if(!updateValue(&a2, row, 10)) return;
-    if(!updateValue(&a3, row, 11)) return;
-    if(!updateValue(&diff, row, 12)) return;
-    if(!updateValue(&pen, row, 13)) return;
+    if(!updateValue(&e1, row, firstColumn)) return;
+    if(!updateValue(&e2, row, firstColumn + 1)) return;
+    if(!updateValue(&e3, row, firstColumn + 2)) return;
+    if(!updateValue(&a1, row, firstColumn + 3)) return;
+    if(!updateValue(&a2, row, firstColumn + 4)) return;
+    if(!updateValue(&a3, row, firstColumn + 5)) return;
+    if(!updateValue(&diff, row, firstColumn + 6)) return;
+    if(!updateValue(&pen, row, firstColumn + 7)) return;
 
     am = (a1 + a2 + a3) / 3;
     em = (e1 + e2 + e3) / 3 * 2;
     final = am + em + pen + diff;
 
-    d->sheet->write(index.row()+2, 14, em);
-    d->sheet->write(index.row()+2, 15, am);
-    d->sheet->write(index.row()+2, 16, final);
+    d->sheet->write(index.row()+2, firstColumn + 8, em);
+    d->sheet->write(index.row()+2, firstColumn + 9, am);
+    d->sheet->write(index.row()+2, firstColumn + 10, final);
+}
+
+bool SheetModel::changed() const
+{
+    return m_changed;
+}
+
+void SheetModel::setChanged(bool value)
+{
+    m_changed = value;
 }
 
 QT_END_NAMESPACE_XLSX
