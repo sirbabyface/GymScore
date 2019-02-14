@@ -31,6 +31,9 @@
 #include <QColor>
 #include <QFont>
 
+#include "../settings.h"
+#include "3rdparty/exprtk.hpp"
+
 QT_BEGIN_NAMESPACE_XLSX
 
 SheetModelPrivate::SheetModelPrivate(SheetModel *p)
@@ -51,9 +54,11 @@ SheetModelPrivate::SheetModelPrivate(SheetModel *p)
 /*!
  * Creates a model object with the given \a sheet and \a parent.
  */
-SheetModel::SheetModel(Worksheet *sheet, QObject *parent)
-    :QAbstractTableModel(parent), d_ptr(new SheetModelPrivate(this)),
-     m_changed(false)
+SheetModel::SheetModel(Worksheet *sheet, const Settings *settings, QObject *parent)
+    : QAbstractTableModel(parent),
+      m_changed(false),
+      m_settings(settings),
+      d_ptr(new SheetModelPrivate(this))
 {
     d_ptr->sheet = sheet;
 }
@@ -81,12 +86,16 @@ int SheetModel::columnCount(const QModelIndex &/*parent*/) const
 
 Qt::ItemFlags SheetModel::flags(const QModelIndex &index) const
 {
-    if(index.column() < 14) {
-        return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable;
+    Qt::ItemFlags flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+
+
+    auto n = m_settings->editableColumns();
+
+    if(m_settings->editableColumns().contains(index.column() + 1)) {
+        flags |= Qt::ItemIsEditable;
     }
-    else {
-        return Qt::ItemIsSelectable | Qt::ItemIsEnabled;
-    }
+
+    return flags;
 }
 
 QVariant SheetModel::data(const QModelIndex &index, int role) const
@@ -214,6 +223,9 @@ bool SheetModel::setData(const QModelIndex &index, const QVariant &value, int ro
         if (d->sheet->write(index.row()+2, index.column()+1, value)) {
             calculateValuesRow(index);
             m_changed = true;
+            QVector<int> roles;
+            roles << Qt::EditRole;
+            emit dataChanged(index, index, roles);
             return true;
         }
     }
@@ -248,32 +260,86 @@ bool SheetModel::updateValue(float *value, int row, int column)
     return false;
 }
 
+bool SheetModel::isValueOk(int row, int column)
+{
+    Q_D(const SheetModel);
+    bool ok;
+
+    Cell *cell = d->sheet->cellAt(row, column);
+    if(!cell) {
+        return false;
+    }
+    cell->value().toReal(&ok);
+    return ok;
+}
+
+/**
+ * @brief Returns the value from the row and column. Before using this method
+ *        use isValueOk to check if it is a valid real number;
+ */
+qreal SheetModel::getValue(int row, int column)
+{
+    Q_D(const SheetModel);
+    bool ok;
+
+    Cell *cell = d->sheet->cellAt(row, column);
+    if(!cell) {
+        return 0;
+    }
+    return cell->value().toReal(&ok);
+}
+
+QString SheetModel::replaceValues(QString formula, QHash<int, qreal> values)
+{
+    QHashIterator<int, qreal> it(values);
+    while (it.hasNext()) {
+        it.next();
+        QString placeholder = QString("{%1}").arg(it.key());
+        formula.replace(placeholder, QString::number(it.value()));
+    }
+    return formula;
+}
+
+/**
+ * @brief Calculates the values using the formulas defined in the settings
+ */
 void SheetModel::calculateValuesRow(const QModelIndex &index)
 {
     Q_D(const SheetModel);
 
-    float a1, a2, a3, e1, e2, e3, diff, pen;
-    float am, em, final;
-    int row = index.row()+2;
+    int row = index.row() + 2;
 
-    int firstColumn = 7;
+    QList<int> editableColumns = m_settings->editableColumns();
+    QHash<int, qreal> values;
 
-    if(!updateValue(&e1, row, firstColumn)) return;
-    if(!updateValue(&e2, row, firstColumn + 1)) return;
-    if(!updateValue(&e3, row, firstColumn + 2)) return;
-    if(!updateValue(&a1, row, firstColumn + 3)) return;
-    if(!updateValue(&a2, row, firstColumn + 4)) return;
-    if(!updateValue(&a3, row, firstColumn + 5)) return;
-    if(!updateValue(&diff, row, firstColumn + 6)) return;
-    if(!updateValue(&pen, row, firstColumn + 7)) return;
+    foreach (auto column, editableColumns) {
+        if(!isValueOk(row, column)) {
+            return;
+        }
+        values.insert(column, getValue(row, column));
+    }
 
-    am = (a1 + a2 + a3) / 3;
-    em = (e1 + e2 + e3) / 3 * 2;
-    final = am + em + pen + diff;
+    // If it reaches this point, all editable points are with value, so it
+    // possible to calculate the formula values
+    QList<QPair<int, QString>> formulas = m_settings->formulas();
 
-    d->sheet->write(index.row()+2, firstColumn + 8, em);
-    d->sheet->write(index.row()+2, firstColumn + 9, am);
-    d->sheet->write(index.row()+2, firstColumn + 10, final);
+    foreach(auto formula, formulas) {
+
+        QString mathExpression = replaceValues(formula.second, values);
+
+        exprtk::expression<qreal> expression;
+        exprtk::parser<qreal> parser;
+        if(parser.compile(mathExpression.toStdString(), expression)) {
+            qreal result = expression.value();
+
+            // Add result for the next formulas
+            values.insert(formula.first, result);
+
+            // Update sheet
+            d->sheet->write(row, formula.first, result);
+        }
+    }
+
 }
 
 bool SheetModel::changed() const

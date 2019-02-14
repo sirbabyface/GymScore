@@ -30,13 +30,16 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 WIN32:RC_ICONS += app.ico
 
+QMAKE_CXXFLAGS += -bigobj
+
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
     model/xlsxsheetmodel.cpp \
     formtable.cpp \
     settings.cpp \
-    labelinfo.cpp
+    labelinfo.cpp \
+    imageinfo.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -45,7 +48,8 @@ HEADERS += \
     formtable.h \
     settings.h \
     3rdparty/exprtk.hpp \
-    labelinfo.h
+    labelinfo.h \
+    imageinfo.h
 
 RESOURCES += \
     images.qrc
@@ -53,5 +57,4 @@ RESOURCES += \
 FORMS += \
     formtable.ui
 
-DISTFILES += \
-    view.qml
+

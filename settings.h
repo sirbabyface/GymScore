@@ -5,6 +5,7 @@
 #include <QSettings>
 
 #include "labelinfo.h"
+#include "imageinfo.h"
 
 class Settings : public QObject
 {
@@ -15,6 +16,7 @@ public:
 
     bool isLoaded() const;
 
+    QSize size() const;
     QString pubFolder() const;
     void setPubFolder(const QString &folder);
     QList<LabelInfo> labels() const;
@@ -23,8 +25,10 @@ public:
     QDate competitionDate() const;
     void setCompetitionName(const QString &name);
     void setCompetitionDate(const QDate &date);
-    QList<QPair<QString, QString>> formulas() const;
+    QList<QPair<int, QString> > formulas() const;
 
+
+    QList<ImageInfo> blankImages() const;
 
 signals:
 
@@ -38,7 +42,8 @@ private:
     const QString GROUP_COMPETITION = "Competition";
     const QString GROUP_LABELS = "Labels";
     const QString GROUP_FORMULAS = "Formulas";
-    const QString GROUP_EDITABLE = "Editable";
+    const QString GROUP_COLUMNS = "Columns";
+    const QString GROUP_BLANK = "Blank";
 };
 
 #endif // SETTINGS_H

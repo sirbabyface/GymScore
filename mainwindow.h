@@ -23,20 +23,26 @@ public:
     ~MainWindow();
 
     QGraphicsScene *loadInformation(int row, const QXlsx::Worksheet *sheet);
+    QGraphicsScene *loadInformation(int row, const QXlsx::Worksheet *sheet, const Settings &settings);
 
     QGraphicsScene *blank();
 
+    void setupScene(const Settings &settings);
+    void setupBlankScene(const Settings &settings);
+
 protected:
     void mouseDoubleClickEvent(QMouseEvent *e);
+    void resizeEvent(QResizeEvent *e);
 
     void setupScene();
-    void setupScene(const Settings &settings);
     void setupBlankScene();
+
     void setupRankingScene();
+    void setupArea(QGraphicsScene &scene, const QSize &size);
     void setItem(QGraphicsTextItem *item, int x, int y);
     void updatePlayersPosition(const QList<QString> &players);
 
-    void paintEvent(QPaintEvent *pQEvent);
+//    void paintEvent(QPaintEvent *pQEvent);
     void updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item);
     void updateItemStringCenter(QXlsx::Cell *cell, QGraphicsTextItem *item);
     void updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item, const QString &prefix);

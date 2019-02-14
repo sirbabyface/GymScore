@@ -3,7 +3,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QPoint>
-
+#include <QSize>
 
 Settings::Settings(QObject *parent) : QObject(parent),
                                       m_settings(nullptr)
@@ -16,6 +16,19 @@ Settings::Settings(QObject *parent) : QObject(parent),
 bool Settings::isLoaded() const
 {
     return m_settings != nullptr;
+}
+
+QSize Settings::size() const
+{
+    QSize size;
+    if(!isLoaded()) {
+        return size;
+    }
+
+    size.setWidth(m_settings->value(GROUP_COMPETITION + "/width", 640).toInt());
+    size.setHeight(m_settings->value(GROUP_COMPETITION + "/height", 480).toInt());
+
+    return size;
 }
 
 QString Settings::pubFolder() const
@@ -63,7 +76,6 @@ QList<LabelInfo> Settings::labels() const
         else {
             list.push_back(LabelInfo(position, text, size, color));
         }
-        m_settings->endGroup();
     }
 
     m_settings->endArray();
@@ -82,14 +94,17 @@ QList<int> Settings::editableColumns() const
         return list;
     }
 
-    auto columns = m_settings->value(GROUP_EDITABLE + "/columns").toString();
-    foreach (auto column, columns.split(",")) {
+    m_settings->beginGroup(GROUP_COLUMNS);
+    auto columns = m_settings->value("editable").toStringList();
+
+    foreach (auto column, columns) {
         bool ok;
         int number = column.toInt(&ok);
         if(ok) {
             list.push_back(number);
         }
     }
+    m_settings->endGroup();
 
     return list;
 }
@@ -136,9 +151,9 @@ void Settings::setCompetitionDate(const QDate &date)
     m_settings->setValue(GROUP_COMPETITION + "/date", date);
 }
 
-QList<QPair<QString, QString> > Settings::formulas() const
+QList<QPair<int, QString>> Settings::formulas() const
 {
-    QList<QPair<QString, QString>> list;
+    QList<QPair<int, QString>> list;
     if(!isLoaded()) {
         return list;
     }
@@ -146,10 +161,42 @@ QList<QPair<QString, QString> > Settings::formulas() const
     m_settings->beginGroup(GROUP_FORMULAS);
     QStringList keys = m_settings->childKeys();
     foreach (auto key, keys) {
-        auto node = QPair<QString, QString>(key, m_settings->value(key).toString());
+        bool ok;
+        int column = key.toInt(&ok);
+        if(!ok) {
+            continue; // skip, since key is not valid integer
+        }
+        QPair<int, QString> node = QPair<int, QString>(column, m_settings->value(key).toString());
         list.push_back(node);
     }
 
+    m_settings->endGroup();
+
+    return list;
+}
+
+QList<ImageInfo> Settings::blankImages() const
+{
+
+    QList<ImageInfo> list;
+
+    if(!isLoaded()) {
+        return list;
+    }
+
+    m_settings->beginGroup(GROUP_BLANK);
+
+    int size = m_settings->beginReadArray("images");
+
+    for (int i = 0; i < size; ++i) {
+        m_settings->setArrayIndex(i);
+        QString image = m_settings->value("image").toString();
+        qreal scale = m_settings->value("scale").toReal();
+        QPoint position = m_settings->value("position").toPoint();
+        list.push_back(ImageInfo(image, scale, position));
+    }
+
+    m_settings->endArray();
     m_settings->endGroup();
 
     return list;

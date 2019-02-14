@@ -28,6 +28,7 @@
 
 #include "xlsxglobal.h"
 #include <QAbstractTableModel>
+#include <settings.h>
 
 QT_BEGIN_NAMESPACE_XLSX
 
@@ -39,7 +40,7 @@ class SheetModel : public QAbstractTableModel
     Q_OBJECT
     Q_DECLARE_PRIVATE(SheetModel)
 public:
-    explicit SheetModel(Worksheet *sheet, QObject *parent = nullptr);
+    explicit SheetModel(Worksheet *sheet, const Settings *settings, QObject *parent = nullptr);
     ~SheetModel();
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const;
@@ -60,10 +61,15 @@ public slots:
 
 protected:
     bool updateValue(float *value, int row, int column);
+    bool isValueOk(int row, int column);
+    qreal getValue(int row, int column);
+    QString replaceValues(QString formula, QHash<int, qreal> values);
     void calculateValuesRow(const QModelIndex &index);
-    bool m_changed;
+
 
 private:
+    bool m_changed;
+    const Settings * m_settings;
     SheetModelPrivate * const d_ptr;
 };
 

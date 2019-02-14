@@ -33,12 +33,6 @@ MainWindow::~MainWindow()
 
 }
 
-void MainWindow::paintEvent(QPaintEvent *pQEvent)
-{
-    fitInView(m_sceneInfo.sceneRect(), Qt::KeepAspectRatio);
-    QGraphicsView::paintEvent(pQEvent);
-}
-
 
 QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet)
 {
@@ -62,6 +56,14 @@ QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *she
     updateItemFloat(sheet->cellAt(row, 16), m_scoreArtistic);
     updateItemFloat(sheet->cellAt(row, 17), m_finalScore);
 
+
+    fitInView(m_sceneInfo.sceneRect(), Qt::KeepAspectRatio);
+
+    return &m_sceneInfo;
+}
+
+QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet, const Settings &settings)
+{
     return &m_sceneInfo;
 }
 
@@ -136,6 +138,7 @@ void MainWindow::updateItemPlayers(QXlsx::Cell *cell)
 QGraphicsScene *MainWindow::blank()
 {
     setScene(&m_sceneBlank);
+    fitInView(m_sceneBlank.sceneRect(), Qt::KeepAspectRatio);
     if(isHidden()) {
         show();
     }
@@ -151,7 +154,15 @@ void MainWindow::mouseDoubleClickEvent( QMouseEvent * e )
         else {
             showFullScreen();
         }
+
+        fitInView(scene()->sceneRect(), Qt::KeepAspectRatio);
     }
+}
+
+void MainWindow::resizeEvent(QResizeEvent *e)
+{
+    QGraphicsView::resizeEvent(e);
+    fitInView(scene()->sceneRect(), Qt::KeepAspectRatio);
 }
 
 void MainWindow::setupScene()
@@ -247,26 +258,42 @@ void MainWindow::setupScene()
 
 void MainWindow::setupScene(const Settings &settings)
 {
-
+    setupArea(m_sceneInfo, settings.size());
 }
 
 void MainWindow::setupBlankScene()
 {
     m_sceneBlank.setBackgroundBrush(QBrush(Qt::black));
+    setupArea(m_sceneBlank, QSize(640, 480));
 
-    // Rectangle to set the area
-    QGraphicsRectItem *block = m_sceneBlank.addRect(0, 0, 640, 480);
-    block->setPen(Qt::NoPen);
-    block->setBrush(QColor(102, 153, 51));
-    block->setZValue(-1);
-    block->hide();
+//    // Rectangle to set the area
+//    QGraphicsRectItem *block = m_sceneBlank.addRect(0, 0, 640, 480);
+//    block->setPen(Qt::NoPen);
+//    block->setBrush(QColor(102, 153, 51));
+//    block->setZValue(-1);
+//    block->hide();
 
 
-    acm = m_sceneBlank.addPixmap(QPixmap(":/img/acm.png"));
-    acm->setScale(0.6);
-    acm->update();
-    acm->setPos(320 - acm->boundingRect().width() * 0.6 / 2, 200 - acm->boundingRect().height() * 0.6 / 2);
+//    acm = m_sceneBlank.addPixmap(QPixmap(":/img/acm.png"));
+//    acm->setScale(0.6);
+//    acm->update();
+//    acm->setPos(320 - acm->boundingRect().width() * 0.6 / 2, 200 - acm->boundingRect().height() * 0.6 / 2);
 }
+
+void MainWindow::setupBlankScene(const Settings &settings)
+{
+    m_sceneBlank.clear();
+    setupArea(m_sceneBlank, settings.size());
+
+    QList<ImageInfo> images = settings.blankImages();
+    foreach (auto info, images) {
+        QGraphicsPixmapItem *image = m_sceneBlank.addPixmap(QPixmap(info.getImage()));
+        image->setScale(info.getScale());
+        image->update();
+        image->setPos(info.getPosition());
+    }
+}
+
 
 void MainWindow::setupRankingScene()
 {
@@ -327,6 +354,15 @@ void MainWindow::setupRankingScene()
         setItem(m_rankingScore[i], 480, firstRowY + interval * i);
     }
 
+}
+
+void MainWindow::setupArea(QGraphicsScene &scene, const QSize &size)
+{
+    QGraphicsRectItem *block = scene.addRect(QRect(QPoint(0, 0), size));
+    block->setPen(Qt::NoPen);
+    block->setBrush(QColor(102, 153, 51));
+    block->setZValue(-1);
+    block->hide();
 }
 
 void MainWindow::updatePlayersPosition(const QList<QString> &players)

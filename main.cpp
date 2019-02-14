@@ -17,12 +17,7 @@ int main(int argc, char *argv[])
     qRegisterMetaTypeStreamOperators<QList<int> >("QList<int>");
 
     MainWindow w;
-
-    FormTable f;
-    f.setInfoWindow(&w);
-
-
-
+    FormTable f(&w);
 
     if(a.screens().size() >= 2) {
         QRect rect =  a.screens()[0]->geometry();
