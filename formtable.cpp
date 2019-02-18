@@ -33,10 +33,11 @@ FormTable::FormTable(MainWindow *infoWindow, QWidget *parent)
     connect(m_ui->buttonLeft, SIGNAL(clicked()), this, SLOT(moveLeft()));
     connect(m_ui->buttonRight, SIGNAL(clicked()), this, SLOT(moveRight()));
     connect(m_ui->buttonRules, SIGNAL(clicked()), this, SLOT(loadRules()));
+    connect(m_ui->tableView, SIGNAL(clicked(const QModelIndex&)), this, SLOT(tableClicked(const QModelIndex&)));
 
     // For speeding testing
-    loadRules(QDir::currentPath() + "/config/ginastica-artistica.ini");
-    loadFile(QDir::currentPath() + "/../2018-05-26-prova-graciano-acm/Tabela Manhã.xlsx");
+    loadRules(QDir::currentPath() + "/config/ginastica-centro.ini");
+    loadFile(QDir::currentPath() + "/../2019-02-16-prova-artistica/Manha2.xlsx");
 }
 
 FormTable::~FormTable()
@@ -80,6 +81,7 @@ void FormTable::closeEvent (QCloseEvent *event)
         }
     }
 }
+
 
 void FormTable::setInfoWindow(MainWindow *win)
 {
@@ -139,6 +141,12 @@ void FormTable::loadFile(const QString &filePath)
 
 bool FormTable::saveFile()
 {
+    if(m_doc == Q_NULLPTR) {
+        QMessageBox::information(this, QApplication::applicationName(),
+                                 tr("No file was loaded. Before saving a file should be opened."));
+        return false;
+    }
+
     QString filePath = QFileDialog::getSaveFileName(this, QApplication::applicationName() + " - " + tr("Save File"),
                                                     m_previousPath,
                                                     "*.xlsx");
@@ -187,7 +195,7 @@ void FormTable::updateInfoWindow()
         return;
     }
 
-    m_infoWindow->loadInformation(row + 1, m_sheet);
+    m_infoWindow->loadInformation(row + 1, m_sheet, *m_settings);
 }
 
 /**
@@ -215,6 +223,9 @@ void FormTable::loadRules(const QString &filePath)
         m_settings = settings;
         // update blank scene
         m_infoWindow->setupBlankScene(*m_settings);
+        m_infoWindow->setupScene(*m_settings);
+
+        m_ui->labelRules->setText(m_settings->competitionName());
     }
     else {
         delete settings;
@@ -230,7 +241,45 @@ void FormTable::dataChanged(const QModelIndex &topLeft,
 
     if(roles.contains(Qt::EditRole)) {
         m_ui->tableView->resizeColumnsToContents();
+
+        int row = topLeft.row();
+        int column = topLeft.column();
+
+        moveToNextEditableCell(row, column);
+
+    }
+
+}
+
+void FormTable::tableClicked(const QModelIndex &index)
+{
+    int column = index.column() + 1;
+    if(m_settings->editableColumns().contains(column)) {
+        m_ui->tableView->setCurrentIndex(index);
+        m_ui->tableView->edit(index);
     }
 }
 
 
+
+void FormTable::moveToNextEditableCell(int row, int column)
+{
+    column++; // For the QModel the column start in 0
+
+    QList<int> editable = m_settings->editableColumns();
+
+    if(column == editable.last()) {
+        // Already in last editable column don't do nothing
+        return;
+    }
+
+    int pos = editable.indexOf(column);
+    if(pos == -1) {
+        return;
+    }
+    int nextColumn = editable.at(pos + 1) - 1; // QModel starts in 0
+
+    QModelIndex nextIndex = m_model->index(row, nextColumn);
+    m_ui->tableView->setCurrentIndex(nextIndex);
+    m_ui->tableView->edit(nextIndex);
+}

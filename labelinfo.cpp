@@ -1,20 +1,17 @@
 #include "labelinfo.h"
 
 LabelInfo::LabelInfo(const QPoint &position, const QString &text,
-                           int size, QString color, QObject *parent):
-    QObject(parent), position(position), text(text), size(size), color(color), column(0)
+                     int size, QString color, QString style, QObject *parent)
+    : QObject(parent), position(position), text(text), size(size), color(color),
+      style(style), column(0), alignment("left")
 {
 }
 
-LabelInfo::LabelInfo(const QPoint &position, const QString &text,
-                     int size, QString color, int column, QObject *parent):
-    QObject(parent), position(position), text(text), size(size), color(color), column(column)
-{
-}
 
-LabelInfo::LabelInfo(const LabelInfo &label):
-    QObject(label.parent()), position(label.position), text(label.text),
-    size(label.size), color(label.color), column(label.column)
+LabelInfo::LabelInfo(const LabelInfo &label)
+    : QObject(label.parent()), position(label.position), text(label.text),
+      size(label.size), color(label.color), style(label.style),
+      column(label.column), alignment(label.alignment)
 {
 }
 
@@ -33,6 +30,21 @@ int LabelInfo::getSize() const
     return size;
 }
 
+QString LabelInfo::getColor() const
+{
+    return color;
+}
+
+QString LabelInfo::getStyle() const
+{
+    return style;
+}
+
+int LabelInfo::getColumn() const
+{
+    return column;
+}
+
 LabelInfo &LabelInfo::operator=(const LabelInfo &label)
 {
     text = label.text;
@@ -40,17 +52,24 @@ LabelInfo &LabelInfo::operator=(const LabelInfo &label)
     size = label.size;
     column = label.column;
     color = label.color;
+    style = label.style;
+    alignment = label.alignment;
     // Should parent be copied?
     //setParent(score.parent());
     return *this;
 }
 
-QString LabelInfo::getColor() const
+void LabelInfo::setColumn(int value)
 {
-    return color;
+    column = value;
 }
 
-int LabelInfo::getColumn() const
+void LabelInfo::setAlignment(const QString &value)
 {
-    return column;
+    alignment = value;
+}
+
+QString LabelInfo::getAlignment() const
+{
+    return alignment;
 }

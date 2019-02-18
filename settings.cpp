@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QPoint>
 #include <QSize>
+#include <algorithm>
 
 Settings::Settings(QObject *parent) : QObject(parent),
                                       m_settings(nullptr)
@@ -31,26 +32,14 @@ QSize Settings::size() const
     return size;
 }
 
-QString Settings::pubFolder() const
+QString Settings::fontName() const
 {
-    if(!isLoaded()) {
-        return QDir::currentPath() + "pub";
-    }
-
-    return m_settings->value(GROUP_COMPETITION + "/pubFolder", "pub").toString();
+     if(!isLoaded()) {
+         return "Arial";
+     }
+     return m_settings->value(GROUP_COMPETITION + "/font", "Arial").toString();
 }
 
-void Settings::setPubFolder(const QString &folder)
-{
-    if(!isLoaded()) {
-        return;
-    }
-
-    // Convert folder to relative path
-    QString relativeFolder = QDir::current().relativeFilePath(folder);
-
-    m_settings->setValue(GROUP_COMPETITION + "/pubFolder", relativeFolder);
-}
 
 QList<LabelInfo> Settings::labels() const
 {
@@ -65,17 +54,24 @@ QList<LabelInfo> Settings::labels() const
     for (int i = 0; i < size; ++i) {
 
         m_settings->setArrayIndex(i);
+
         QPoint position = m_settings->value("position").toPoint();
         QString text = m_settings->value("text").toString();
         int size = m_settings->value("size").toInt();
         QString color = m_settings->value("color").toString();
+        QString style = m_settings->value("style").toString();
+        LabelInfo label(position, text, size, color, style);
+
         if(m_settings->contains("column"))  {
             int column = m_settings->value("column").toInt();
-            list.push_back(LabelInfo(position, text, size, color, column));
+            label.setColumn(column);
         }
-        else {
-            list.push_back(LabelInfo(position, text, size, color));
+
+        if(m_settings->contains("alignment"))  {
+            QString alignment = m_settings->value("alignment").toString();
+            label.setAlignment(alignment);
         }
+        list.push_back(label);
     }
 
     m_settings->endArray();
@@ -135,6 +131,19 @@ QDate Settings::competitionDate() const
     return m_settings->value(GROUP_COMPETITION + "/date", QDate::currentDate()).toDate();
 }
 
+ImageInfo Settings::competitionLogo() const
+{
+    if(!isLoaded()) {
+        return ImageInfo("", 1, QPoint());
+    }
+
+    QString image = m_settings->value(GROUP_COMPETITION + "/logo/image").toString();
+    qreal scale = m_settings->value(GROUP_COMPETITION + "/logo/scale").toReal();
+    QPoint position = m_settings->value(GROUP_COMPETITION + "/logo/position").toPoint();
+
+    return ImageInfo(image, scale, position);
+}
+
 void Settings::setCompetitionName(const QString &name)
 {
     if(!isLoaded()) {
@@ -151,6 +160,7 @@ void Settings::setCompetitionDate(const QDate &date)
     m_settings->setValue(GROUP_COMPETITION + "/date", date);
 }
 
+
 QList<QPair<int, QString>> Settings::formulas() const
 {
     QList<QPair<int, QString>> list;
@@ -160,6 +170,9 @@ QList<QPair<int, QString>> Settings::formulas() const
 
     m_settings->beginGroup(GROUP_FORMULAS);
     QStringList keys = m_settings->childKeys();
+    // Sort the keys
+    std::sort(keys.begin(), keys.end(), sortNumericStrings);
+
     foreach (auto key, keys) {
         bool ok;
         int column = key.toInt(&ok);
@@ -203,6 +216,28 @@ QList<ImageInfo> Settings::blankImages() const
 }
 
 /**
+ * @brief Returns the column number used by the type
+ */
+int Settings::column(Settings::Column type) const
+{
+    switch (type) {
+    case Players:
+        return m_settings->value(GROUP_COLUMNS + "/players").toInt();
+    case Team:
+        return m_settings->value(GROUP_COLUMNS + "/team").toInt();
+    case Level:
+        return m_settings->value(GROUP_COLUMNS + "/level").toInt();
+    case Type:
+        return m_settings->value(GROUP_COLUMNS + "/type").toInt();
+    case Club:
+        return m_settings->value(GROUP_COLUMNS + "/club").toInt();
+    case Number:
+        return m_settings->value(GROUP_COLUMNS + "/number").toInt();
+    }
+    return 0;
+}
+
+/**
  * @brief Loads competition configurations from filename.
  *
  * TODO: Add list of configurations available
@@ -226,5 +261,12 @@ void Settings::save()
     if(isLoaded()) {
         m_settings->sync();
     }
+}
+
+bool Settings::sortNumericStrings(const QString &s1, const QString &s2)
+{
+    int n1 = s1.toInt();
+    int n2 = s2.toInt();
+    return n1 < n2;
 }
 

@@ -156,7 +156,7 @@ QVariant SheetModel::data(const QModelIndex &index, int role) const
             return QBrush(cell->format().fontColor());
     } else if (role == Qt::BackgroundRole) {
         if (index.row() % 2 == 0) {
-            return QBrush(Qt::gray);
+            return QBrush(Qt::lightGray);
         }
         else {
             return QBrush(Qt::white);

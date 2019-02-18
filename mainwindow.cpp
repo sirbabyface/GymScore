@@ -30,11 +30,10 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-
 }
 
-
-QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet)
+QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet,
+                                            const Settings &settings)
 {
     if(!m_sceneInfo.isActive()) {
         setScene(&m_sceneInfo);
@@ -44,26 +43,55 @@ QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *she
         show();
     }
 
-    updateItemString(sheet->cellAt(row, 1), m_type);
-    updateItemString(sheet->cellAt(row, 2), m_number);
-    updateItemPlayers(sheet->cellAt(row, 3));
-    updateItemString(sheet->cellAt(row, 4), m_level);
-    updateItemStringCenter(sheet->cellAt(row, 5), m_club);
-    updateItemString(sheet->cellAt(row, 6), m_team, tr("Equipa"));
-    updateItemFloat(sheet->cellAt(row, 13), m_difficulty);
-    updateItemFloat(sheet->cellAt(row, 14), m_penalization);
-    updateItemFloat(sheet->cellAt(row, 15), m_scoreExecution);
-    updateItemFloat(sheet->cellAt(row, 16), m_scoreArtistic);
-    updateItemFloat(sheet->cellAt(row, 17), m_finalScore);
+    foreach(auto item, m_sceneInfo.items()) {
+        // check if item need to be updated with info from a column
+        QVariant columnData = item->data(KEY_COLUMN);
+        if(columnData.isNull()) {
+            continue;
+        }
 
+        // Get column number
+        bool ok;
+        int column = columnData.toInt(&ok);
+        if(!ok) {
+            continue;
+        }
+        QGraphicsTextItem* text = dynamic_cast<QGraphicsTextItem*>(item);
+        QXlsx::Cell *cell = sheet->cellAt(row, column);
 
-    fitInView(m_sceneInfo.sceneRect(), Qt::KeepAspectRatio);
+        // Check if column is from players
+        if(settings.column(Settings::Players) == column) {
+            updateItemPlayers(cell, text);
+            continue;
+        }
 
-    return &m_sceneInfo;
-}
+        // Check if column is from the team
+        if(settings.column(Settings::Team) == column) {
+            updateItemString(cell, text, tr("Equipa"));
+            continue;
+        }
 
-QGraphicsScene *MainWindow::loadInformation(int row, const QXlsx::Worksheet *sheet, const Settings &settings)
-{
+        // Check if column is number
+        if(settings.column(Settings::Number) == column) {
+            updateItemString(cell, text);
+            continue;
+        }
+
+        // Update column text
+        if(cell == Q_NULLPTR) {
+            // if cell is empty/not set
+            text->setPlainText("0,00");
+            continue;
+        }
+
+        if(cell->cellType() == QXlsx::Cell::NumberType) {
+            updateItemFloat(cell, text);
+        }
+        else {
+            updateItemString(cell, text);
+        }
+    }
+
     return &m_sceneInfo;
 }
 
@@ -127,12 +155,26 @@ void MainWindow::updateItemFloat(QXlsx::Cell *cell, QGraphicsTextItem *item)
     item->setPlainText(value);
 }
 
-void MainWindow::updateItemPlayers(QXlsx::Cell *cell)
+void MainWindow::updateItemPlayers(QXlsx::Cell *cell, QGraphicsTextItem *text)
 {
     if(!cell) return;
 
-    QList<QString> players = cell->value().toString().split("/");
-    updatePlayersPosition(players);
+    QList<QString> players;
+    QString playersNames = cell->value().toString();
+    if(playersNames.indexOf("/") != -1) {
+        players = playersNames.split("/", QString::SkipEmptyParts);
+    }
+    else if(playersNames.indexOf(";") != -1) {
+        players = playersNames.split(";", QString::SkipEmptyParts);
+    }
+    else if(playersNames.indexOf(",") != -1) {
+        players = playersNames.split(",", QString::SkipEmptyParts);
+    }
+    else {
+        players.append(playersNames);
+    }
+
+    updatePlayersPosition(players, text);
 }
 
 QGraphicsScene *MainWindow::blank()
@@ -167,117 +209,46 @@ void MainWindow::resizeEvent(QResizeEvent *e)
 
 void MainWindow::setupScene()
 {
-    QString fontFamily = "Calibri";
-    QFont fontLabel;
-    fontLabel.setFamily(fontFamily);
-    fontLabel.setPointSize(32);
-    fontLabel.setBold(true);
-
-    QFont fontLabelFinalScore;
-    fontLabelFinalScore.setFamily(fontFamily);
-    fontLabelFinalScore.setPointSize(42);
-    fontLabelFinalScore.setBold(true);
-
-    QFont fontPlayers;
-    fontPlayers.setPointSize(28);
-    fontPlayers.setBold(true);
-
-    QFont fontScore;
-    fontScore.setFamily(fontFamily);
-    fontScore.setPointSize(72);
-    fontScore.setBold(true);
-
-    // Rectangle to set the area
-    QGraphicsRectItem *block = m_sceneInfo.addRect(0, 0, 640, 480);
-    block->setPen(Qt::NoPen);
-    block->setBrush(QColor(102, 153, 51));
-    block->setZValue(-1);
-    block->hide();
-
-    QGraphicsTextItem *labelExecution = m_sceneInfo.addText(tr("EXE"), fontLabel);
-    setItem(labelExecution, 40, 265);
-
-    QGraphicsTextItem *labelArtistic = m_sceneInfo.addText(tr("ART"), fontLabel);
-    setItem(labelArtistic, 40, 310);
-
-    QGraphicsTextItem *labelFinalScore = m_sceneInfo.addText(tr("Nota Final"), fontLabelFinalScore);
-    setItem(labelFinalScore, 40, 380);
-
-    m_finalScore = m_sceneInfo.addText("0,00", fontScore);
-    m_finalScore->setDefaultTextColor(QColor(255, 192, 0));
-    m_finalScore->setPos(350, 340);
-
-    QGraphicsTextItem *labelDifficulty = m_sceneInfo.addText(tr("DIF"), fontLabel);
-    setItem(labelDifficulty, 350, 265);
-
-    QGraphicsTextItem *labelPenalty = m_sceneInfo.addText(tr("PEN"), fontLabel);
-    setItem(labelPenalty, 350, 310);
-
-    m_scoreExecution = m_sceneInfo.addText("0,00", fontLabel);
-    setItem(m_scoreExecution, 150, 265);
-
-    m_scoreArtistic = m_sceneInfo.addText("0,00", fontLabel);
-    setItem(m_scoreArtistic, 150, 310);
-
-    m_difficulty = m_sceneInfo.addText("0,00", fontLabel);
-    setItem(m_difficulty, 460, 265);
-
-    m_penalization = m_sceneInfo.addText("0,00", fontLabel);
-    setItem(m_penalization, 460, 310);
-
-
-    for (int i = 0; i < 3; ++i) {
-        m_players[i] = m_sceneInfo.addText("", fontPlayers);
-        m_players[i]->setDefaultTextColor(QColor(102, 255, 204));
-    }
-
-    QList<QString> players;
-    players << "Tiago Correia" << "Mariana Correia";
-    players << "Matilde Fonseca";
-    updatePlayersPosition(players);
-
-    m_level = m_sceneInfo.addText("NIVEL 1", fontLabel);
-    setItem(m_level, 120, 75);
-
-    m_type = m_sceneInfo.addText("PF", fontLabel);
-    setItem(m_type, 40, 75);
-
-    m_club = m_sceneInfo.addText("ACM", fontLabel);
-    setItem(m_club, 240, 20);
-
-    m_team = m_sceneInfo.addText("Equipa A", fontLabel);
-    setItem(m_team, 460, 75);
-
-    m_number = m_sceneInfo.addText("34", fontLabel);
-    setItem(m_number, 120, 20);
-
-    m_teamIcon = m_sceneInfo.addPixmap(QPixmap(":/img/acm.png"));
-    m_teamIcon->setScale(0.1);
-    m_teamIcon->setPos(40, 20);
+    m_sceneInfo.clear();
+    m_sceneInfo.setBackgroundBrush(QBrush(Qt::black));
 }
 
 void MainWindow::setupScene(const Settings &settings)
 {
+    m_sceneInfo.clear();
+    m_sceneInfo.setBackgroundBrush(QBrush(Qt::black));
     setupArea(m_sceneInfo, settings.size());
+
+    QString fontName = settings.fontName();
+    foreach (auto label, settings.labels()) {
+        QFont font = QFont(fontName, label.getSize());
+        if(label.getStyle() == "bold") {
+            font.setBold(true);
+        }
+
+        QGraphicsTextItem *item = m_sceneInfo.addText(label.getText(), font);
+        item->setDefaultTextColor(QColor(label.getColor()));
+        item->setPos(label.getPosition());
+        if(label.getColumn() > 0) {
+            item->setData(KEY_COLUMN, label.getColumn());
+        }
+
+        if(label.getAlignment() == "center") {
+            // Save position, to be used to center item
+            item->setData(KEY_POSITION, label.getPosition());
+        }
+    }
+
+    ImageInfo logoInfo = settings.competitionLogo();
+    QGraphicsPixmapItem *logo = m_sceneInfo.addPixmap(QPixmap(logoInfo.getImage()));
+    logo->setScale(logoInfo.getScale());
+    logo->setPos(logoInfo.getPosition());
 }
 
 void MainWindow::setupBlankScene()
 {
     m_sceneBlank.setBackgroundBrush(QBrush(Qt::black));
     setupArea(m_sceneBlank, QSize(640, 480));
-
-//    // Rectangle to set the area
-//    QGraphicsRectItem *block = m_sceneBlank.addRect(0, 0, 640, 480);
-//    block->setPen(Qt::NoPen);
-//    block->setBrush(QColor(102, 153, 51));
-//    block->setZValue(-1);
-//    block->hide();
-
-
-//    acm = m_sceneBlank.addPixmap(QPixmap(":/img/acm.png"));
-//    acm->setScale(0.6);
-//    acm->update();
-//    acm->setPos(320 - acm->boundingRect().width() * 0.6 / 2, 200 - acm->boundingRect().height() * 0.6 / 2);
 }
 
 void MainWindow::setupBlankScene(const Settings &settings)
@@ -297,7 +268,9 @@ void MainWindow::setupBlankScene(const Settings &settings)
 
 void MainWindow::setupRankingScene()
 {
+    // TODO
     m_sceneBlank.setBackgroundBrush(QBrush(Qt::black));
+    //setupArea(m_sceneBlank, settings.size());
 
     // Rectangle to set the area
     QGraphicsRectItem *block = m_sceneRanking.addRect(0, 0, 640, 480);
@@ -305,55 +278,6 @@ void MainWindow::setupRankingScene()
     block->setBrush(QColor(102, 153, 51));
     block->setZValue(-1);
 //    block->hide();
-
-    // Fonts
-    QString fontFamily = "Calibri";
-    QFont fontTitle;
-    fontTitle.setFamily(fontFamily);
-    fontTitle.setPointSize(42);
-    fontTitle.setBold(true);
-
-    QFont fontLabel;
-    fontLabel.setFamily(fontFamily);
-    fontLabel.setPointSize(32);
-    fontLabel.setBold(true);
-
-    QFont fontPlayers;
-    fontPlayers.setFamily(fontFamily);
-    fontPlayers.setPointSize(16);
-    fontPlayers.setBold(true);
-
-    // Logo on top
-    QGraphicsPixmapItem *logo = m_sceneRanking.addPixmap(QPixmap(":/img/acm.png"));
-    logo->setScale(0.1);
-    logo->setPos(40, 20);
-
-    // Create Items
-    m_rankingTitle = m_sceneRanking.addText("RANKING", fontTitle);
-    setItem(m_rankingTitle, 120, 10);
-
-    m_rankingLevel = m_sceneRanking.addText("NIVEL 1", fontLabel);
-    setItem(m_rankingLevel, 60, 75);
-
-    m_rankingType = m_sceneRanking.addText("GF", fontLabel);
-    setItem(m_rankingType, 520, 75);
-
-    int firstRowY = 135;
-    int interval = 80;
-    for (int i = 0; i < 4; ++i) {
-        m_rankingPosition[i] = m_sceneRanking.addText(QString::number(i + 1) + ".", fontPlayers);
-        setItem(m_rankingPosition[i], 40, firstRowY + interval * i);
-
-        m_rankingClub[i] = m_sceneRanking.addText("ACM", fontPlayers);
-        setItem(m_rankingClub[i], 90, firstRowY + interval * i);
-
-        m_rankingPlayers[i] = m_sceneRanking.addText("Francisca Sena, Sara Machado\nJoana Conceição", fontPlayers);
-        setItem(m_rankingPlayers[i], 90, firstRowY + 25 + interval * i);
-
-        m_rankingScore[i] = m_sceneRanking.addText("22,21", fontPlayers);
-        setItem(m_rankingScore[i], 480, firstRowY + interval * i);
-    }
-
 }
 
 void MainWindow::setupArea(QGraphicsScene &scene, const QSize &size)
@@ -365,38 +289,40 @@ void MainWindow::setupArea(QGraphicsScene &scene, const QSize &size)
     block->hide();
 }
 
-void MainWindow::updatePlayersPosition(const QList<QString> &players)
+void MainWindow::updatePlayersPosition(const QList<QString> &players,
+                                       QGraphicsTextItem *item)
 {
+    QString text;
     switch(players.size()) {
-        case 2:
-            m_players[0]->setPlainText(players[0]);
-            m_players[0]->setPos(320 - m_players[0]->boundingRect().width() / 2, 140);
-            m_players[1]->setPlainText(players[1]);
-            m_players[1]->setPos(320 - m_players[1]->boundingRect().width() / 2, 180);
-            m_players[2]->setPlainText("");
+        case 1:
+            text = players[0].trimmed();
             break;
+        case 2:
         case 3:
-            m_players[0]->setPlainText(players[0]);
-            m_players[0]->setPos(320 - m_players[0]->boundingRect().width() / 2, 125);
-            m_players[1]->setPlainText(players[1]);
-            m_players[1]->setPos(320 - m_players[1]->boundingRect().width() / 2, 165);
-            m_players[2]->setPlainText(players[2]);
-            m_players[2]->setPos(320 - m_players[2]->boundingRect().width() / 2, 205);
+            foreach(auto player, players) {
+                text += player.trimmed() + "<br>";
+            }
             break;
         case 4:
-            m_players[0]->setPlainText(players[0] + ", " + players[1]);
-            m_players[0]->setPos(320 - m_players[0]->boundingRect().width() / 2, 130);
-            m_players[1]->setPlainText(players[2] + ", " + players[3]);
-            m_players[1]->setPos(320 - m_players[1]->boundingRect().width() / 2, 170);
-            m_players[2]->setPlainText("");
-            break;
-        default:
-            break;
+            // 2 players per line
+            text += players[0].trimmed() + ", ";
+            text += players[1].trimmed() + "<br>";
+            text += players[2].trimmed() + ", ";
+            text += players[3].trimmed() + "";
     }
-}
 
-void MainWindow::setItem(QGraphicsTextItem *item, int x, int y)
-{
-    item->setDefaultTextColor(Qt::white);
-    item->setPos(x, y);
+    // Check if it should be centered
+    if(!item->data(KEY_POSITION).isNull()) {
+        text = "<p align='center'>" + text + "</p>";
+        item->setHtml(text);
+        QPoint point = item->data(KEY_POSITION).toPoint();
+        item->adjustSize();
+        point.setX(point.x() - item->boundingRect().width() / 2);
+        point.setY(point.y() - item->boundingRect().height() / 2);
+        item->setPos(point);
+    }
+    else {
+        text = "<p>" + text + "</p>";
+        item->setHtml(text);
+    }
 }

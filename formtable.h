@@ -38,8 +38,12 @@ public slots:
     void loadRules();
     void loadRules(const QString &filePath);
     void dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles);
-
+    void tableClicked(const QModelIndex &index);
     void closeEvent(QCloseEvent *event);
+
+private:
+    void moveToNextEditableCell(int row, int column);
+
 
 private:
     Ui::FormTable *m_ui;

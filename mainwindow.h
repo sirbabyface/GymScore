@@ -19,7 +19,7 @@ class MainWindow : public QGraphicsView
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = 0);
+    MainWindow(QWidget *parent = Q_NULLPTR);
     ~MainWindow();
 
     QGraphicsScene *loadInformation(int row, const QXlsx::Worksheet *sheet);
@@ -39,46 +39,22 @@ protected:
 
     void setupRankingScene();
     void setupArea(QGraphicsScene &scene, const QSize &size);
-    void setItem(QGraphicsTextItem *item, int x, int y);
-    void updatePlayersPosition(const QList<QString> &players);
+    void updatePlayersPosition(const QList<QString> &players, QGraphicsTextItem *item);
 
-//    void paintEvent(QPaintEvent *pQEvent);
     void updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item);
     void updateItemStringCenter(QXlsx::Cell *cell, QGraphicsTextItem *item);
     void updateItemString(QXlsx::Cell *cell, QGraphicsTextItem *item, const QString &prefix);
     void updateItemFloat(QXlsx::Cell *cell, QGraphicsTextItem *item);
-    void updateItemPlayers(QXlsx::Cell *cell);
+    void updateItemPlayers(QXlsx::Cell *cell, QGraphicsTextItem *item);
+
+    const int KEY_COLUMN = 1;
+    const int KEY_ALIGNMENT = 2;
+    const int KEY_POSITION = 3;
+
 private:
     QGraphicsScene m_sceneInfo;
     QGraphicsScene m_sceneBlank;
     QGraphicsScene m_sceneRanking;
-
-    // Score
-    QGraphicsTextItem *m_number;
-    QGraphicsTextItem *m_players[3];
-    QGraphicsTextItem *m_scoreExecution;
-    QGraphicsTextItem *m_scoreArtistic;
-    QGraphicsTextItem *m_difficulty;
-    QGraphicsTextItem *m_penalization;
-    QGraphicsTextItem *m_finalScore;
-    QGraphicsTextItem *m_level;
-    QGraphicsTextItem *m_type;
-    QGraphicsTextItem *m_club;
-    QGraphicsTextItem *m_team;
-    QGraphicsPixmapItem *m_teamIcon;
-
-    // Ranking
-    QGraphicsTextItem *m_rankingPlayers[4];
-    QGraphicsTextItem *m_rankingTitle;
-    QGraphicsTextItem *m_rankingPosition[4];
-    QGraphicsTextItem *m_rankingScore[4];
-    QGraphicsTextItem *m_rankingClub[4];
-    QGraphicsTextItem *m_rankingLevel;
-    QGraphicsTextItem *m_rankingType;
-
-    // Blank
-    QGraphicsPixmapItem *acm;
-    QGraphicsPixmapItem *pub;
 
 };
 
